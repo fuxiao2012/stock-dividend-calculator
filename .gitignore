@@ -24,5 +24,8 @@ Thumbs.db
 # Claude
 .claude/
 
+# Data exports
+data/exports/
+
 # Temp files
 *.tmp
