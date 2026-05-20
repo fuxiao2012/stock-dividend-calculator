@@ -29,11 +29,10 @@ def load_dashboard_data(year: str):
     return stats, portfolio_summary, monthly, account_stats
 
 
-st.title("📊 数据总览")
-
-# 年份选择放在右侧
-_, right_col = st.columns([3, 1])
-with right_col:
+col1, col2 = st.columns([4, 1])
+with col1:
+    st.title("📊 数据总览")
+with col2:
     year = str(st.selectbox("选择年份", [str(y) for y in range(2026, 2019, -1)], index=0))
 stats, portfolio, monthly, account_stats = load_dashboard_data(year)
 
