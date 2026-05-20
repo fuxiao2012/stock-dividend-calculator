@@ -1,0 +1,28 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+*.egg
+
+# Streamlit
+.streamlit/
+
+# Database files
+*.db
+*.db-shm
+*.db-wal
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude
+.claude/
+
+# Temp files
+*.tmp
