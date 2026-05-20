@@ -128,11 +128,14 @@ class SyncManager:
 
     def _log_sync(self, sync_type: str, stock_code: Optional[str], result: dict, started_at: str):
         conn = DatabaseEngine.get_connection()
-        finished_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        finished_at = datetime.now()
+        started_dt = datetime.strptime(started_at, "%Y-%m-%d %H:%M:%S")
+        duration = round((finished_at - started_dt).total_seconds(), 1)
         conn.execute("""
             INSERT INTO sync_log (sync_type, stock_code, status, records_fetched,
-                                  records_inserted, error_message, started_at, finished_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                                  records_inserted, error_message, started_at, finished_at,
+                                  duration_seconds)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """, (
             sync_type,
             stock_code,
@@ -141,7 +144,8 @@ class SyncManager:
             result.get("inserted", 0),
             result.get("error", ""),
             started_at,
-            finished_at,
+            finished_at.strftime("%Y-%m-%d %H:%M:%S"),
+            duration,
         ))
         conn.commit()
 

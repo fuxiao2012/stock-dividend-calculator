@@ -156,5 +156,9 @@ def init_database():
         conn.execute("ALTER TABLE dividend_calculations ADD COLUMN progress TEXT DEFAULT ''")
     except Exception:
         pass
+    try:
+        conn.execute("ALTER TABLE sync_log ADD COLUMN duration_seconds REAL DEFAULT 0")
+    except Exception:
+        pass
 
     conn.commit()
