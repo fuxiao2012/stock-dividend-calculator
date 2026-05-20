@@ -31,7 +31,10 @@ def load_dashboard_data(year: str):
 
 st.title("📊 数据总览")
 
-year = str(st.sidebar.selectbox("选择年份", [str(y) for y in range(2026, 2019, -1)], index=0))
+# 年份选择放在右侧
+_, right_col = st.columns([3, 1])
+with right_col:
+    year = str(st.selectbox("选择年份", [str(y) for y in range(2026, 2019, -1)], index=0))
 stats, portfolio, monthly, account_stats = load_dashboard_data(year)
 
 # KPI 卡片
