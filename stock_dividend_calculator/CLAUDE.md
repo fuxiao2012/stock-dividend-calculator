@@ -73,3 +73,4 @@ app.py                          # Streamlit 入口，7 页面导航
 - **ETF 分红来源**: A 股走 `stock_history_dividend_detail`，ETF（15/51/56/58 开头）走 `fund_fh_em`，ETF 每份分红 × 10 = cash_per_10
 - **5 年限制**: `sync_stock` 中 `since_year = datetime.now().year - 5`，A 股 API 过滤 announce_date，ETF API 默认查近 5 年
 - **预案税率**: `_calc_one` 中若 `ex_date` 为空（预案无除息日）→ tax_rate=0，net=gross
+- **.gitignore 路径**: gitignore 规则相对于仓库根目录匹配。`data/exports/` 只匹配根下的 `data/exports/`，不匹配 `stock_dividend_calculator/data/exports/`。子目录下的路径需写完整路径如 `stock_dividend_calculator/data/`，或用 `**/exports/`。每条规则加完后必须跑 `git status` 验证文件被正确忽略

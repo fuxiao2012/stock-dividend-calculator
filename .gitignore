@@ -24,8 +24,8 @@ Thumbs.db
 # Claude
 .claude/
 
-# Data exports
-data/exports/
+# Data (runtime generated)
+stock_dividend_calculator/data/
 
 # Temp files
 *.tmp
