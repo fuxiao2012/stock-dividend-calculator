@@ -28,7 +28,7 @@ if sync_logs:
     with col4:
         st.metric("新增记录", last["records_inserted"])
     with col5:
-        dur = last.get("duration_seconds")
+        dur = last["duration_seconds"] if "duration_seconds" in last else None
         st.metric("耗时", f"{dur:.0f}秒" if dur else "—")
 
     # 数据概况
@@ -95,6 +95,6 @@ if all_logs:
         "时间": log["created_at"], "类型": log["sync_type"],
         "股票": log["stock_code"] or "全部", "状态": log["status"],
         "获取": log["records_fetched"], "新增": log["records_inserted"],
-        "耗时(秒)": f"{log.get('duration_seconds'):.0f}" if log.get("duration_seconds") else "—",
+        "耗时(秒)": f"{dur_val:.0f}" if (dur_val := log["duration_seconds"] if "duration_seconds" in log else None) else "—",
     } for log in all_logs]
     st.dataframe(pd.DataFrame(log_data), use_container_width=True, hide_index=True)
