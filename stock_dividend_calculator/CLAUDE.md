@@ -66,7 +66,7 @@ app.py                          # Streamlit 入口，7 页面导航
 ## 常见陷阱
 
 - **akshare 列名**: `stock_history_dividend_detail` 返回 `派息`（Unicode 0x6d3e, 0x606f）不是 `股息`（0x80a1, 0x606f）
-- **DataFrame 转 dict**: `pd.DataFrame(sqlite3.Row)` → 列名丢失成数字，必须 `pd.DataFrame([dict(r) for r in rows])`
+- **sqlite3.Row 陷阱**: `pd.DataFrame(sqlite3.Row)` → 列名丢失成数字，必须 `pd.DataFrame([dict(r) for r in rows])`。Row 没有 `.get()` 方法，需用 `"key" in row` 检查键存在性再取 `row["key"]`
 - **NULL 去重**: SQLite 中 `UNIQUE(col_with_nulls)` 对 NULL 失效，必须用显式 SELECT 检查。`_safe_str()` 将 NaT/nan 转为 None
 - **Streamlit file_uploader**: 上传后调用 `st.rerun()` 会导致无限循环重新导入，必须用 `st.session_state` 记录已处理文件的标识（name_size）
 - **数据库锁**: 非 Streamlit 环境测试时需先停止 Streamlit 进程并删除 WAL 锁文件（`*.db-shm`, `*.db-wal`）
