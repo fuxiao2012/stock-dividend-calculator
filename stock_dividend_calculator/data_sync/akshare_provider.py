@@ -106,6 +106,36 @@ class AkshareDividendProvider(DividendProvider):
             raise DataSyncError(f"获取股票列表失败: {e}") from e
 
     @api_retry(max_retries=2, delay=2.0)
+    def get_all_etf_dividends(self, years: list = None) -> pd.DataFrame:
+        """获取全市场 ETF 分红数据（不按代码过滤，一次调用覆盖所有 ETF）"""
+        if years is None:
+            from datetime import datetime
+            years = [str(y) for y in range(datetime.now().year, datetime.now().year - 5, -1)]
+        frames = []
+        try:
+            import akshare as ak
+            for year in years:
+                df = ak.fund_fh_em(year=year)
+                if not df.empty:
+                    frames.append(df)
+            if not frames:
+                return pd.DataFrame()
+            result = pd.concat(frames, ignore_index=True)
+            cols = result.columns.tolist()
+            # 基金代码在第2列（索引1），名称在第3列（索引2）
+            result["stock_code"] = result[cols[1]].astype(str).str.strip()
+            result["cash_per_10"] = (pd.to_numeric(result[cols[5]], errors="coerce") * 10).round(2)
+            result["announce_date"] = self._safe_date(result[cols[3]])
+            result["record_date"] = self._safe_date(result[cols[3]])
+            result["ex_dividend_date"] = self._safe_date(result[cols[4]])
+            result["bonus_share_date"] = self._safe_date(result[cols[6]])
+            result["stock_name"] = result[cols[2]]
+            result["progress"] = "实施"
+            return result
+        except Exception as e:
+            raise DataSyncError(f"获取全市场ETF分红失败: {e}") from e
+
+    @api_retry(max_retries=2, delay=2.0)
     def get_etf_dividend(self, stock_code: str, years: list = None) -> pd.DataFrame:
         """获取 ETF 分红数据（通过 fund_fh_em）"""
         if years is None:

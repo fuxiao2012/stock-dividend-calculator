@@ -61,41 +61,96 @@ class SyncManager:
         return str(code).startswith(("15", "51", "56", "58"))
 
     def sync_all(self, progress_callback: Optional[Callable] = None) -> dict:
-        """全量同步所有持仓股票的分红数据"""
+        """全量同步所有持仓股票的分红数据（ETF 批量拉取，A股逐只拉取）"""
         started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         stocks = self.db.fetch_all("SELECT DISTINCT stock_code FROM positions WHERE is_active = 1")
-        codes = [row["stock_code"] for row in stocks]
+        all_codes = [row["stock_code"] for row in stocks]
 
-        if not codes:
+        if not all_codes:
             return {"status": "成功", "total": 0, "succeeded": 0, "failed": 0, "results": []}
 
+        # 分离 ETF 和 A 股
+        etf_codes = [c for c in all_codes if self._is_etf(c)]
+        stock_codes = [c for c in all_codes if not self._is_etf(c)]
+        total = len(all_codes)
         results = []
         succeeded = 0
         failed = 0
-        for i, code in enumerate(codes):
+
+        # ETF 批量同步
+        if etf_codes:
+            etf_results = self._sync_etf_batch(etf_codes, progress_callback, offset=0, total=total)
+            results.extend(etf_results)
+
+        # A 股逐只同步
+        for i, code in enumerate(stock_codes):
             r = self.sync_stock(code)
             results.append(r)
+            if progress_callback:
+                progress_callback((len(etf_codes) + i + 1) / total)
+
+        # 统计全部结果
+        for r in results:
             if r["status"] == "成功":
                 succeeded += 1
             else:
                 failed += 1
-            if progress_callback:
-                progress_callback((i + 1) / len(codes))
 
         self._log_sync("全量", None, {
             "status": "成功" if failed == 0 else "失败",
-            "total": len(codes),
+            "total": total,
             "succeeded": succeeded,
             "failed": failed,
         }, started_at)
 
         return {
             "status": "成功" if failed == 0 else "部分失败",
-            "total": len(codes),
+            "total": total,
             "succeeded": succeeded,
             "failed": failed,
             "results": results,
         }
+
+    def _sync_etf_batch(self, codes: list, progress_callback=None, offset=0, total=0) -> list:
+        """批量同步所有 ETF：一次性拉取全市场数据，再按代码分发"""
+        current_year = datetime.now().year
+        # 判断是否需要5年数据：任一 ETF 是首次同步就需要
+        need_full = any(not self._has_existing_records(c) for c in codes)
+        if need_full:
+            years = [str(y) for y in range(current_year, current_year - 5, -1)]
+        else:
+            years = [str(current_year)]
+
+        all_data = self.provider.get_all_etf_dividends(years=years)
+        results = []
+
+        for i, code in enumerate(codes):
+            started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            is_first = not self._has_existing_records(code)
+            result = {"stock_code": code, "status": "成功", "fetched": 0, "inserted": 0,
+                      "name_updated": False, "sync_scope": "近5年" if is_first else "当年"}
+            try:
+                if all_data.empty:
+                    result["fetched"] = 0
+                else:
+                    subset = all_data[all_data["stock_code"] == code]
+                    result["fetched"] = len(subset)
+                    if not subset.empty:
+                        result["inserted"] = self._insert_etf_records(subset)
+                result["name_updated"] = self._update_stock_name(code)
+            except DataSyncError as e:
+                result["status"] = "失败"
+                result["error"] = str(e)
+            except Exception as e:
+                result["status"] = "失败"
+                result["error"] = str(e)
+
+            self._log_sync("单只股票", code, result, started_at)
+            results.append(result)
+            if progress_callback and total:
+                progress_callback((offset + i + 1) / total)
+
+        return results
 
     def _insert_records(self, df: pd.DataFrame) -> int:
         """将 DataFrame 中的分红记录插入数据库（去重，含 NULL 安全处理）"""
