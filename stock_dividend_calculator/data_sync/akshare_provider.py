@@ -136,6 +136,44 @@ class AkshareDividendProvider(DividendProvider):
             raise DataSyncError(f"获取全市场ETF分红失败: {e}") from e
 
     @api_retry(max_retries=2, delay=2.0)
+    def get_all_stock_prices(self) -> pd.DataFrame:
+        """获取全市场 A 股实时行情（东方财富）"""
+        try:
+            import akshare as ak
+            df = ak.stock_zh_a_spot_em()
+            if df.empty:
+                return df
+            cols = df.columns.tolist()
+            result = pd.DataFrame()
+            # 列: 0=序号, 1=代码, 2=名称, 3=最新价, 4=涨跌幅
+            result["stock_code"] = df[cols[1]].astype(str).str.strip()
+            result["stock_name"] = df[cols[2]].astype(str)
+            result["current_price"] = pd.to_numeric(df[cols[3]], errors="coerce")
+            result["change_pct"] = pd.to_numeric(df[cols[4]], errors="coerce")
+            return result
+        except Exception as e:
+            raise DataSyncError(f"获取A股市价失败: {e}") from e
+
+    @api_retry(max_retries=2, delay=2.0)
+    def get_all_etf_prices(self) -> pd.DataFrame:
+        """获取全市场 ETF 实时行情（东方财富）"""
+        try:
+            import akshare as ak
+            df = ak.fund_etf_spot_em()
+            if df.empty:
+                return df
+            cols = df.columns.tolist()
+            result = pd.DataFrame()
+            # 列: 0=代码, 1=名称, 2=最新价, 6=涨跌幅
+            result["stock_code"] = df[cols[0]].astype(str).str.strip()
+            result["stock_name"] = df[cols[1]].astype(str)
+            result["current_price"] = pd.to_numeric(df[cols[2]], errors="coerce")
+            result["change_pct"] = pd.to_numeric(df[cols[6]], errors="coerce")
+            return result
+        except Exception as e:
+            raise DataSyncError(f"获取ETF市价失败: {e}") from e
+
+    @api_retry(max_retries=2, delay=2.0)
     def get_etf_dividend(self, stock_code: str, years: list = None) -> pd.DataFrame:
         """获取 ETF 分红数据（通过 fund_fh_em）"""
         if years is None:

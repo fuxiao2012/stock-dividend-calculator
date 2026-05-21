@@ -26,7 +26,25 @@ def load_dashboard_data(year: str):
         if s["total_gross"] > 0:
             account_stats.append({"账户": acc["account_name"], "税前分红": s["total_gross"], "税后分红": s["total_net"]})
 
-    return stats, portfolio_summary, monthly, account_stats
+    from database.engine import DatabaseEngine as _DB
+    db = _DB()
+    market_value = 0
+    cost_value = 0
+    positions = db.fetch_all("""
+        SELECT p.quantity, p.cost_price, s.current_price
+        FROM positions p
+        LEFT JOIN stocks s ON p.stock_code = s.stock_code
+        WHERE p.is_active = 1
+    """)
+    for p in positions:
+        qty = p["quantity"]
+        cost = p["cost_price"] or 0
+        price = p["current_price"] or 0
+        market_value += qty * price
+        cost_value += qty * cost
+    pnl = market_value - cost_value if market_value > 0 else 0
+
+    return stats, portfolio_summary, monthly, account_stats, market_value, pnl
 
 
 col1, col2 = st.columns([4, 1])
@@ -34,10 +52,10 @@ with col1:
     st.title("📊 数据总览")
 with col2:
     year = str(st.selectbox("选择年份", [str(y) for y in range(2026, 2019, -1)], index=0))
-stats, portfolio, monthly, account_stats = load_dashboard_data(year)
+stats, portfolio, monthly, account_stats, market_value, pnl = load_dashboard_data(year)
 
 # KPI 卡片
-col1, col2, col3, col4 = st.columns(4)
+col1, col2, col3, col4, col5 = st.columns(5)
 with col1:
     st.metric("持仓股票数", portfolio["total_positions"])
 with col2:
@@ -45,7 +63,9 @@ with col2:
 with col3:
     st.metric(f"{year}年税前分红", f"¥{stats['total_gross']:,.2f}")
 with col4:
-    st.metric("分红记录数", stats["record_count"])
+    st.metric("持仓总市值", f"¥{market_value:,.2f}")
+with col5:
+    st.metric("浮动盈亏", f"¥{pnl:,.2f}")
 
 st.divider()
 

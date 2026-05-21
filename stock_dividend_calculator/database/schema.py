@@ -160,5 +160,13 @@ def init_database():
         conn.execute("ALTER TABLE sync_log ADD COLUMN duration_seconds REAL DEFAULT 0")
     except Exception:
         pass
+    try:
+        conn.execute("ALTER TABLE stocks ADD COLUMN current_price REAL")
+    except Exception:
+        pass
+    try:
+        conn.execute("ALTER TABLE stocks ADD COLUMN price_updated_at TEXT")
+    except Exception:
+        pass
 
     conn.commit()
