@@ -77,6 +77,17 @@ st.markdown("""
         color: #ccd6dd !important;
     }
 
+    /* 工具栏 */
+    .toolbar-row {
+        display: flex;
+        align-items: center;
+        background: #f0f2f5;
+        border: 1px solid #dde1e6;
+        border-radius: 8px;
+        padding: 8px 16px;
+        margin-bottom: 4px;
+    }
+
     /* Tab 标签 */
     .stTabs [data-baseweb="tab-list"] {
         gap: 8px;
@@ -205,8 +216,11 @@ with tab2:
                 "备注": p["notes"] or "",
             })
         df = pd.DataFrame(pos_data)
-
         display_cols = [c for c in df.columns if c != "_买入日期_str"]
+
+        editor_key = f"pos_table_{selected_account_id}"
+        toolbar = st.empty()
+
         edited_df = st.data_editor(
             df[display_cols],
             column_config={
@@ -222,21 +236,28 @@ with tab2:
             },
             hide_index=True,
             use_container_width=True,
-            key=f"pos_table_{selected_account_id}",
+            key=editor_key,
         )
 
-        # 操作按钮行
-        btn_col1, btn_col2, btn_col3, btn_col4 = st.columns([1, 1, 1, 5])
-        with btn_col1:
-            save_btn = st.button("💾 保存修改", type="primary", use_container_width=True)
-        with btn_col2:
-            delete_btn = st.button("🗑 删除选中", use_container_width=True)
-        with btn_col3:
-            sell_btn = st.button("📤 标记卖出", use_container_width=True)
-
-        # 选中计数
         selected_ids = edited_df[edited_df["选中"] == True]["ID"].tolist()
-        st.caption(f"已选 **{len(selected_ids)}** 条持仓")
+
+        # 工具栏 —— 渲染在表格上方
+        with toolbar.container():
+            t_left, t_right = st.columns([1, 1])
+            with t_left:
+                btn_col1, btn_col2, btn_col3 = st.columns([1, 1, 1])
+                with btn_col1:
+                    save_btn = st.button("💾 保存修改", type="primary", use_container_width=True)
+                with btn_col2:
+                    delete_btn = st.button("🗑 删除选中", use_container_width=True)
+                with btn_col3:
+                    sell_btn = st.button("📤 标记卖出", use_container_width=True)
+            with t_right:
+                st.markdown(
+                    f"<div style='text-align:right;padding-top:12px;color:#8899aa;font-size:0.9rem'>"
+                    f"已选 <b style='color:#ff6b6b'>{len(selected_ids)}</b> 条持仓</div>",
+                    unsafe_allow_html=True,
+                )
 
         # 保存修改
         if save_btn:
