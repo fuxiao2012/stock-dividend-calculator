@@ -136,23 +136,26 @@ class AkshareDividendProvider(DividendProvider):
             raise DataSyncError(f"获取全市场ETF分红失败: {e}") from e
 
     @api_retry(max_retries=2, delay=2.0)
-    def get_all_stock_prices(self) -> pd.DataFrame:
-        """获取全市场 A 股实时行情（东方财富）"""
+    def get_stock_price(self, stock_code: str) -> dict:
+        """获取单只 A 股最新价格（东方财富日K线）"""
         try:
             import akshare as ak
-            df = ak.stock_zh_a_spot_em()
+            from datetime import datetime, timedelta
+            today = datetime.now()
+            start = (today - timedelta(days=10)).strftime("%Y%m%d")
+            end = today.strftime("%Y%m%d")
+            df = ak.stock_zh_a_hist(symbol=stock_code, period="daily",
+                                    start_date=start, end_date=end)
             if df.empty:
-                return df
-            cols = df.columns.tolist()
-            result = pd.DataFrame()
-            # 列: 0=序号, 1=代码, 2=名称, 3=最新价, 4=涨跌幅
-            result["stock_code"] = df[cols[1]].astype(str).str.strip()
-            result["stock_name"] = df[cols[2]].astype(str)
-            result["current_price"] = pd.to_numeric(df[cols[3]], errors="coerce")
-            result["change_pct"] = pd.to_numeric(df[cols[4]], errors="coerce")
-            return result
+                return {"stock_code": stock_code, "current_price": None, "change_pct": None}
+            latest = df.iloc[-1]
+            return {
+                "stock_code": stock_code,
+                "current_price": float(latest["收盘"]),
+                "change_pct": float(latest["涨跌幅"]) if latest["涨跌幅"] else None,
+            }
         except Exception as e:
-            raise DataSyncError(f"获取A股市价失败: {e}") from e
+            raise DataSyncError(f"获取 {stock_code} 股价失败: {e}") from e
 
     @api_retry(max_retries=2, delay=2.0)
     def get_all_etf_prices(self) -> pd.DataFrame:

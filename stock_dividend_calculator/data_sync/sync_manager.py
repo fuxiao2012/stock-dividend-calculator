@@ -50,19 +50,27 @@ class SyncManager:
             try:
                 if self._is_etf(stock_code):
                     price_df = self.provider.get_all_etf_prices()
+                    if not price_df.empty:
+                        match = price_df[price_df["stock_code"] == stock_code]
+                        if not match.empty:
+                            price = float(match.iloc[0]["current_price"])
+                            if not pd.isna(price):
+                                conn = DatabaseEngine.get_connection()
+                                conn.execute(
+                                    "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                                    (price, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), stock_code),
+                                )
+                                conn.commit()
                 else:
-                    price_df = self.provider.get_all_stock_prices()
-                if not price_df.empty:
-                    match = price_df[price_df["stock_code"] == stock_code]
-                    if not match.empty:
-                        price = float(match.iloc[0]["current_price"])
-                        if not pd.isna(price):
-                            conn = DatabaseEngine.get_connection()
-                            conn.execute(
-                                "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
-                                (price, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), stock_code),
-                            )
-                            conn.commit()
+                    info = self.provider.get_stock_price(stock_code)
+                    price = info.get("current_price")
+                    if price is not None:
+                        conn = DatabaseEngine.get_connection()
+                        conn.execute(
+                            "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                            (float(price), datetime.now().strftime("%Y-%m-%d %H:%M:%S"), stock_code),
+                        )
+                        conn.commit()
             except Exception:
                 pass
         except DataSyncError as e:
@@ -181,31 +189,25 @@ class SyncManager:
         return results
 
     def _sync_stock_prices(self, codes: list) -> int:
-        """批量同步 A 股市价，返回更新行数"""
-        try:
-            df = self.provider.get_all_stock_prices()
-            if df.empty:
-                return 0
-            conn = DatabaseEngine.get_connection()
-            updated = 0
-            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            codes_set = set(codes)
-            for _, row in df.iterrows():
-                code = row["stock_code"]
-                if code not in codes_set:
-                    continue
-                price = row["current_price"]
-                if pd.isna(price):
+        """逐只同步 A 股市价（使用日K线收盘价），返回更新行数"""
+        updated = 0
+        conn = DatabaseEngine.get_connection()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        for code in codes:
+            try:
+                info = self.provider.get_stock_price(code)
+                price = info.get("current_price")
+                if price is None:
                     continue
                 conn.execute(
                     "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
                     (float(price), now, code),
                 )
                 updated += 1
-            conn.commit()
-            return updated
-        except Exception:
-            return 0
+            except Exception:
+                continue
+        conn.commit()
+        return updated
 
     def _sync_etf_prices(self, codes: list) -> int:
         """批量同步 ETF 市价，返回更新行数"""
