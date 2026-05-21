@@ -46,6 +46,25 @@ class SyncManager:
                     inserted = self._insert_records(df)
                 result["inserted"] = inserted
             result["name_updated"] = self._update_stock_name(stock_code)
+            # 刷新该股最新价格
+            try:
+                if self._is_etf(stock_code):
+                    price_df = self.provider.get_all_etf_prices()
+                else:
+                    price_df = self.provider.get_all_stock_prices()
+                if not price_df.empty:
+                    match = price_df[price_df["stock_code"] == stock_code]
+                    if not match.empty:
+                        price = float(match.iloc[0]["current_price"])
+                        if not pd.isna(price):
+                            conn = DatabaseEngine.get_connection()
+                            conn.execute(
+                                "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                                (price, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), stock_code),
+                            )
+                            conn.commit()
+            except Exception:
+                pass
         except DataSyncError as e:
             result["status"] = "失败"
             result["error"] = str(e)
@@ -89,6 +108,13 @@ class SyncManager:
             if progress_callback:
                 progress_callback((len(etf_codes) + i + 1) / total)
 
+        # 批量同步市价
+        price_updated = 0
+        if stock_codes:
+            price_updated += self._sync_stock_prices(stock_codes)
+        if etf_codes:
+            price_updated += self._sync_etf_prices(etf_codes)
+
         # 统计全部结果
         for r in results:
             if r["status"] == "成功":
@@ -96,11 +122,13 @@ class SyncManager:
             else:
                 failed += 1
 
+        price_msg = f"，价格已更新 {price_updated} 只" if price_updated else ""
         self._log_sync("全量", None, {
             "status": "成功" if failed == 0 else "失败",
             "total": total,
             "succeeded": succeeded,
             "failed": failed,
+            "error": price_msg,
         }, started_at)
 
         return {
@@ -151,6 +179,60 @@ class SyncManager:
                 progress_callback((offset + i + 1) / total)
 
         return results
+
+    def _sync_stock_prices(self, codes: list) -> int:
+        """批量同步 A 股市价，返回更新行数"""
+        try:
+            df = self.provider.get_all_stock_prices()
+            if df.empty:
+                return 0
+            conn = DatabaseEngine.get_connection()
+            updated = 0
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            codes_set = set(codes)
+            for _, row in df.iterrows():
+                code = row["stock_code"]
+                if code not in codes_set:
+                    continue
+                price = row["current_price"]
+                if pd.isna(price):
+                    continue
+                conn.execute(
+                    "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                    (float(price), now, code),
+                )
+                updated += 1
+            conn.commit()
+            return updated
+        except Exception:
+            return 0
+
+    def _sync_etf_prices(self, codes: list) -> int:
+        """批量同步 ETF 市价，返回更新行数"""
+        try:
+            df = self.provider.get_all_etf_prices()
+            if df.empty:
+                return 0
+            conn = DatabaseEngine.get_connection()
+            updated = 0
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            codes_set = set(codes)
+            for _, row in df.iterrows():
+                code = row["stock_code"]
+                if code not in codes_set:
+                    continue
+                price = row["current_price"]
+                if pd.isna(price):
+                    continue
+                conn.execute(
+                    "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                    (float(price), now, code),
+                )
+                updated += 1
+            conn.commit()
+            return updated
+        except Exception:
+            return 0
 
     def _insert_records(self, df: pd.DataFrame) -> int:
         """将 DataFrame 中的分红记录插入数据库（去重，含 NULL 安全处理）"""
