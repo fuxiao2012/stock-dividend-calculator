@@ -135,24 +135,27 @@ class AkshareDividendProvider(DividendProvider):
         except Exception as e:
             raise DataSyncError(f"获取全市场ETF分红失败: {e}") from e
 
-    @api_retry(max_retries=2, delay=2.0)
+    @api_retry(max_retries=2, delay=1.0,
+               degrade_value={"stock_code": "", "current_price": None, "change_pct": None})
     def get_stock_price(self, stock_code: str) -> dict:
-        """获取单只 A 股最新价格（东方财富日K线）"""
+        """获取单只 A 股最新价格（腾讯日K线收盘价）"""
         try:
             import akshare as ak
             from datetime import datetime, timedelta
+            # 腾讯 API 需要 sh/sz 前缀
+            prefix = "sh" if str(stock_code).startswith(("6", "9")) else "sz"
+            symbol = prefix + str(stock_code)
             today = datetime.now()
             start = (today - timedelta(days=10)).strftime("%Y%m%d")
             end = today.strftime("%Y%m%d")
-            df = ak.stock_zh_a_hist(symbol=stock_code, period="daily",
-                                    start_date=start, end_date=end)
+            df = ak.stock_zh_a_hist_tx(symbol=symbol, start_date=start, end_date=end)
             if df.empty:
                 return {"stock_code": stock_code, "current_price": None, "change_pct": None}
             latest = df.iloc[-1]
             return {
                 "stock_code": stock_code,
-                "current_price": float(latest["收盘"]),
-                "change_pct": float(latest["涨跌幅"]) if latest["涨跌幅"] else None,
+                "current_price": float(latest["close"]),
+                "change_pct": None,
             }
         except Exception as e:
             raise DataSyncError(f"获取 {stock_code} 股价失败: {e}") from e

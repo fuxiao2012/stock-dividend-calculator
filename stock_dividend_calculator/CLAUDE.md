@@ -73,5 +73,6 @@ app.py                          # Streamlit 入口，7 页面导航
 - **ETF 分红来源**: A 股走 `stock_history_dividend_detail`，ETF（15/51/56/58 开头）走 `fund_fh_em`，ETF 每份分红 × 10 = cash_per_10
 - **5 年限制**: `sync_stock` 中 `since_year = datetime.now().year - 5`，A 股 API 过滤 announce_date，ETF API 默认查近 5 年
 - **预案税率**: `_calc_one` 中若 `ex_date` 为空（预案无除息日）→ tax_rate=0，net=gross
+- **A 股市价 API 选型**: 东方财富 A 股接口（`stock_zh_a_spot_em`、`stock_zh_a_hist`）均被网络阻断（ConnectionError），Sina `stock_zh_a_spot` 有严格频率限制（第二次调用即返回 HTML）。**腾讯 `stock_zh_a_hist_tx` 是目前唯一可靠的 A 股价源**，需要 `sh`/`sz` 前缀（6/9 开头→`sh`，0/3 开头→`sz`），返回 `close` 列作为 `current_price`
 - **.gitignore 路径**: gitignore 规则相对于仓库根目录匹配。`data/exports/` 只匹配根下的 `data/exports/`，不匹配 `stock_dividend_calculator/data/exports/`。子目录下的路径需写完整路径如 `stock_dividend_calculator/data/`，或用 `**/exports/`。每条规则加完后必须跑 `git status` 验证文件被正确忽略
 - **Worktree 路径陷阱**: `EnterWorktree` 后 CWD 切换到 worktree 副本路径（如 `.claude/worktrees/sync-duration/`），但 `Edit`/`Write` 工具使用绝对路径时容易误指回原始仓库，导致改动落在 master 而非 worktree 分支。进入 worktree 后先用 `pwd` 确认当前路径，所有文件操作使用 worktree 下的路径

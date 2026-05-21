@@ -189,7 +189,7 @@ class SyncManager:
         return results
 
     def _sync_stock_prices(self, codes: list) -> int:
-        """逐只同步 A 股市价（使用日K线收盘价），返回更新行数"""
+        """逐只同步 A 股市价（腾讯日K线收盘价），返回更新行数"""
         updated = 0
         conn = DatabaseEngine.get_connection()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
