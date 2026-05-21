@@ -13,14 +13,29 @@ class SyncManager:
         self.provider = provider or create_provider("A")
         self.db = DatabaseEngine()
 
+    def _has_existing_records(self, stock_code: str) -> bool:
+        """检查 dividend_records 中是否已有该股票的分红数据"""
+        row = self.db.fetch_one(
+            "SELECT 1 FROM dividend_records WHERE stock_code=? LIMIT 1",
+            (stock_code,),
+        )
+        return True if row else False
+
     def sync_stock(self, stock_code: str) -> dict:
         """同步单只股票的分红数据，并更新股票名称"""
         started_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         result = {"stock_code": stock_code, "status": "成功", "fetched": 0, "inserted": 0, "name_updated": False}
-        since_year = datetime.now().year - 5
+        current_year = datetime.now().year
+        is_first_sync = not self._has_existing_records(stock_code)
+        since_year = current_year - 5 if is_first_sync else current_year
+        result["sync_scope"] = "近5年" if is_first_sync else "当年"
         try:
             if self._is_etf(stock_code):
-                df = self.provider.get_etf_dividend(stock_code)
+                if is_first_sync:
+                    years = [str(y) for y in range(current_year, current_year - 5, -1)]
+                else:
+                    years = [str(current_year)]
+                df = self.provider.get_etf_dividend(stock_code, years=years)
             else:
                 df = self.provider.get_dividend_detail(stock_code, since_year=since_year)
             result["fetched"] = len(df)
