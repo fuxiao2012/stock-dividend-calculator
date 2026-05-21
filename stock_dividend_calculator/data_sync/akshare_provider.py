@@ -145,10 +145,11 @@ class AkshareDividendProvider(DividendProvider):
                 return df
             cols = df.columns.tolist()
             result = pd.DataFrame()
-            result["stock_code"] = df[cols[0]].astype(str).str.strip()
-            result["stock_name"] = df[cols[1]].astype(str)
-            result["current_price"] = pd.to_numeric(df[cols[2]], errors="coerce")
-            result["change_pct"] = pd.to_numeric(df[cols[5]], errors="coerce")
+            # 列: 0=序号, 1=代码, 2=名称, 3=最新价, 4=涨跌幅
+            result["stock_code"] = df[cols[1]].astype(str).str.strip()
+            result["stock_name"] = df[cols[2]].astype(str)
+            result["current_price"] = pd.to_numeric(df[cols[3]], errors="coerce")
+            result["change_pct"] = pd.to_numeric(df[cols[4]], errors="coerce")
             return result
         except Exception as e:
             raise DataSyncError(f"获取A股市价失败: {e}") from e
@@ -163,10 +164,11 @@ class AkshareDividendProvider(DividendProvider):
                 return df
             cols = df.columns.tolist()
             result = pd.DataFrame()
+            # 列: 0=代码, 1=名称, 2=最新价, 6=涨跌幅
             result["stock_code"] = df[cols[0]].astype(str).str.strip()
             result["stock_name"] = df[cols[1]].astype(str)
             result["current_price"] = pd.to_numeric(df[cols[2]], errors="coerce")
-            result["change_pct"] = pd.to_numeric(df[cols[5]], errors="coerce")
+            result["change_pct"] = pd.to_numeric(df[cols[6]], errors="coerce")
             return result
         except Exception as e:
             raise DataSyncError(f"获取ETF市价失败: {e}") from e

@@ -154,7 +154,7 @@ with kpi3:
 with kpi4:
     pnl_pct = f"{total_pnl/total_cost_value*100:.1f}%" if total_cost_value > 0 else ""
     st.metric("浮动盈亏", f"¥{total_pnl:,.2f}", delta=pnl_pct if pnl_pct else None,
-              delta_color="inverse" if total_pnl >= 0 else "normal")
+              delta_color="normal")
 
 st.divider()
 
@@ -234,7 +234,7 @@ with tab2:
             price = price_lookup.get(code, 0) or 0
             market_value = round(qty * price, 2) if price > 0 else 0
             cost_total = round(qty * cost_each, 2)
-            pnl = round(market_value - cost_total, 2) if market_value > 0 else None
+            pnl = round(market_value - cost_total, 2)
             pos_data.append({
                 "选中": False,
                 "ID": p["id"],
