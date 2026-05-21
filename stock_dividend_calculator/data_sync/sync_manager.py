@@ -46,6 +46,25 @@ class SyncManager:
                     inserted = self._insert_records(df)
                 result["inserted"] = inserted
             result["name_updated"] = self._update_stock_name(stock_code)
+            # 刷新该股最新价格
+            try:
+                if self._is_etf(stock_code):
+                    price_df = self.provider.get_all_etf_prices()
+                else:
+                    price_df = self.provider.get_all_stock_prices()
+                if not price_df.empty:
+                    match = price_df[price_df["stock_code"] == stock_code]
+                    if not match.empty:
+                        price = float(match.iloc[0]["current_price"])
+                        if not pd.isna(price):
+                            conn = DatabaseEngine.get_connection()
+                            conn.execute(
+                                "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                                (price, datetime.now().strftime("%Y-%m-%d %H:%M:%S"), stock_code),
+                            )
+                            conn.commit()
+            except Exception:
+                pass
         except DataSyncError as e:
             result["status"] = "失败"
             result["error"] = str(e)
