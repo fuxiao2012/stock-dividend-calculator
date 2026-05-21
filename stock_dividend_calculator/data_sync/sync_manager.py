@@ -152,6 +152,60 @@ class SyncManager:
 
         return results
 
+    def _sync_stock_prices(self, codes: list) -> int:
+        """批量同步 A 股市价，返回更新行数"""
+        try:
+            df = self.provider.get_all_stock_prices()
+            if df.empty:
+                return 0
+            conn = DatabaseEngine.get_connection()
+            updated = 0
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            codes_set = set(codes)
+            for _, row in df.iterrows():
+                code = row["stock_code"]
+                if code not in codes_set:
+                    continue
+                price = row["current_price"]
+                if pd.isna(price):
+                    continue
+                conn.execute(
+                    "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                    (float(price), now, code),
+                )
+                updated += 1
+            conn.commit()
+            return updated
+        except Exception:
+            return 0
+
+    def _sync_etf_prices(self, codes: list) -> int:
+        """批量同步 ETF 市价，返回更新行数"""
+        try:
+            df = self.provider.get_all_etf_prices()
+            if df.empty:
+                return 0
+            conn = DatabaseEngine.get_connection()
+            updated = 0
+            now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            codes_set = set(codes)
+            for _, row in df.iterrows():
+                code = row["stock_code"]
+                if code not in codes_set:
+                    continue
+                price = row["current_price"]
+                if pd.isna(price):
+                    continue
+                conn.execute(
+                    "UPDATE stocks SET current_price=?, price_updated_at=? WHERE stock_code=?",
+                    (float(price), now, code),
+                )
+                updated += 1
+            conn.commit()
+            return updated
+        except Exception:
+            return 0
+
     def _insert_records(self, df: pd.DataFrame) -> int:
         """将 DataFrame 中的分红记录插入数据库（去重，含 NULL 安全处理）"""
         conn = DatabaseEngine.get_connection()
