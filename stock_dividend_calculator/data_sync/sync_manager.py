@@ -89,6 +89,13 @@ class SyncManager:
             if progress_callback:
                 progress_callback((len(etf_codes) + i + 1) / total)
 
+        # 批量同步市价
+        price_updated = 0
+        if stock_codes:
+            price_updated += self._sync_stock_prices(stock_codes)
+        if etf_codes:
+            price_updated += self._sync_etf_prices(etf_codes)
+
         # 统计全部结果
         for r in results:
             if r["status"] == "成功":
@@ -96,11 +103,13 @@ class SyncManager:
             else:
                 failed += 1
 
+        price_msg = f"，价格已更新 {price_updated} 只" if price_updated else ""
         self._log_sync("全量", None, {
             "status": "成功" if failed == 0 else "失败",
             "total": total,
             "succeeded": succeeded,
             "failed": failed,
+            "error": price_msg,
         }, started_at)
 
         return {
