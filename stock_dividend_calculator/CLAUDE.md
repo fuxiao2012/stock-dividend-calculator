@@ -69,7 +69,7 @@ app.py                          # Streamlit 入口，7 页面导航
 - **sqlite3.Row 陷阱**: `pd.DataFrame(sqlite3.Row)` → 列名丢失成数字，必须 `pd.DataFrame([dict(r) for r in rows])`。Row 没有 `.get()` 方法，需用 `"key" in row` 检查键存在性再取 `row["key"]`
 - **NULL 去重**: SQLite 中 `UNIQUE(col_with_nulls)` 对 NULL 失效，必须用显式 SELECT 检查。`_safe_str()` 将 NaT/nan 转为 None
 - **Streamlit file_uploader**: 上传后调用 `st.rerun()` 会导致无限循环重新导入，必须用 `st.session_state` 记录已处理文件的标识（name_size）
-- **数据库锁**: 非 Streamlit 环境测试时需先停止 Streamlit 进程并删除 WAL 锁文件（`*.db-shm`, `*.db-wal`）
+- **数据库锁**: 非 Streamlit 环境测试时需先停止 Streamlit。**重启前必须先 checkpoint**：`PRAGMA wal_checkpoint(TRUNCATE)` 将 WAL 写入合并到主 DB，否则 force kill + 删 WAL 文件会导致数据丢失
 - **ETF 分红来源**: A 股走 `stock_history_dividend_detail`，ETF（15/51/56/58 开头）走 `fund_fh_em`，ETF 每份分红 × 10 = cash_per_10
 - **5 年限制**: `sync_stock` 中 `since_year = datetime.now().year - 5`，A 股 API 过滤 announce_date，ETF API 默认查近 5 年
 - **预案税率**: `_calc_one` 中若 `ex_date` 为空（预案无除息日）→ tax_rate=0，net=gross
