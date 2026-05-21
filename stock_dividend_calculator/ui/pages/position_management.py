@@ -112,24 +112,49 @@ selected_account_name = st.sidebar.selectbox(
 selected_account_id = account_options[selected_account_name]
 
 # ── 侧边栏：当前账户摘要 ──────────────────────────────────────────
+_positions_for_kpi = port_svc.list_all(selected_account_id)
+from database.engine import DatabaseEngine as _DB
+_price_lookup_for_kpi = {}
+for code in {p["stock_code"] for p in _positions_for_kpi}:
+    _row = _DB().fetch_one(
+        "SELECT current_price FROM stocks WHERE stock_code=?",
+        (code,),
+    )
+    if _row and _row["current_price"]:
+        _price_lookup_for_kpi[code] = _row["current_price"]
+
+total_market_value = sum(
+    p["quantity"] * (_price_lookup_for_kpi.get(p["stock_code"], 0) or 0)
+    for p in _positions_for_kpi if p["is_active"]
+)
+total_cost_value = sum(
+    p["quantity"] * (p["cost_price"] or 0)
+    for p in _positions_for_kpi if p["is_active"]
+)
+total_pnl = total_market_value - total_cost_value if total_market_value > 0 else 0
+
 with st.sidebar:
     st.divider()
     summary = port_svc.get_summary(selected_account_id)
     unique_stocks = len({
-        p["stock_code"] for p in port_svc.list_all(selected_account_id)
+        p["stock_code"] for p in _positions_for_kpi
         if p["is_active"]
     })
     st.caption(f"📊 活跃持仓 **{summary['total_positions']}** 笔 · **{unique_stocks}** 只")
-    st.caption(f"💰 持仓成本 **¥{summary['total_cost']:,.2f}**")
+    st.caption(f"💰 持仓市值 **¥{total_market_value:,.2f}**")
 
 # ── 顶部摘要 KPI ──────────────────────────────────────────────────
-kpi1, kpi2, kpi3 = st.columns(3)
+kpi1, kpi2, kpi3, kpi4 = st.columns(4)
 with kpi1:
-    st.metric("持仓笔数", summary["total_positions"], delta=None)
+    st.metric("持仓笔数", summary["total_positions"])
 with kpi2:
-    st.metric("持仓股票", unique_stocks, delta=None)
+    st.metric("持仓股票", unique_stocks)
 with kpi3:
-    st.metric("持仓总成本", f"¥{summary['total_cost']:,.2f}", delta=None)
+    st.metric("持仓总市值", f"¥{total_market_value:,.2f}")
+with kpi4:
+    pnl_pct = f"{total_pnl/total_cost_value*100:.1f}%" if total_cost_value > 0 else ""
+    st.metric("浮动盈亏", f"¥{total_pnl:,.2f}", delta=pnl_pct if pnl_pct else None,
+              delta_color="inverse" if total_pnl >= 0 else "normal")
 
 st.divider()
 
@@ -183,6 +208,17 @@ with tab2:
     if not positions:
         st.info("暂无持仓，请先添加或导入")
     else:
+        # 查询现价
+        from database.engine import DatabaseEngine as _DB
+        price_lookup = {}
+        for code in {p["stock_code"] for p in positions}:
+            row_data = _DB().fetch_one(
+                "SELECT current_price FROM stocks WHERE stock_code=?",
+                (code,),
+            )
+            if row_data and row_data["current_price"]:
+                price_lookup[code] = row_data["current_price"]
+
         # 构建数据表
         pos_data = []
         for p in positions:
@@ -192,13 +228,23 @@ with tab2:
                     buy_date_val = date_type.fromisoformat(p["buy_date"][:10])
                 except Exception:
                     buy_date_val = None
+            code = p["stock_code"]
+            qty = p["quantity"]
+            cost_each = p["cost_price"] if p["cost_price"] else 0.0
+            price = price_lookup.get(code, 0) or 0
+            market_value = round(qty * price, 2) if price > 0 else 0
+            cost_total = round(qty * cost_each, 2)
+            pnl = round(market_value - cost_total, 2) if market_value > 0 else None
             pos_data.append({
                 "选中": False,
                 "ID": p["id"],
-                "证券代码": p["stock_code"],
+                "证券代码": code,
                 "证券名称": p["stock_name"],
-                "持仓数量": p["quantity"],
-                "买入成本": p["cost_price"] if p["cost_price"] else 0.0,
+                "持仓数量": qty,
+                "买入成本": cost_each,
+                "现价": price,
+                "市值": market_value,
+                "盈亏": pnl,
                 "_买入日期_str": p["buy_date"] or "",
                 "买入日期": buy_date_val,
                 "状态": "持有" if p["is_active"] else "已卖出",
@@ -217,6 +263,9 @@ with tab2:
                 "持仓数量": st.column_config.NumberColumn("持仓数量", min_value=1, step=100, format="%d"),
                 "买入成本": st.column_config.NumberColumn("买入成本", min_value=0.0, step=0.01, format="¥%.2f"),
                 "买入日期": st.column_config.DateColumn("买入日期", format="YYYY-MM-DD"),
+                "现价": st.column_config.NumberColumn("现价", disabled=True, format="¥%.2f"),
+                "市值": st.column_config.NumberColumn("市值", disabled=True, format="¥%.2f"),
+                "盈亏": st.column_config.NumberColumn("盈亏", disabled=True, format="¥%.2f"),
                 "状态": st.column_config.TextColumn("状态", disabled=True),
                 "备注": st.column_config.TextColumn("备注", disabled=True),
             },
