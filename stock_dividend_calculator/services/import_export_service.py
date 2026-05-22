@@ -9,7 +9,7 @@ from utils.exceptions import ImportError2, ValidationError
 
 
 REQUIRED_COLS = {"证券代码", "持仓数量"}
-OPTIONAL_COLS = {"证券名称", "买入成本", "买入日期", "备注"}
+OPTIONAL_COLS = {"证券名称", "参考成本价", "买入日期", "备注"}
 # 兼容旧版列名
 COL_ALIASES = {
     "股票代码": "证券代码", "持有数量": "持仓数量",
@@ -76,7 +76,7 @@ class ImportExportService:
                     raise ValidationError("持仓数量必须大于0")
                 name_raw = row.get("证券名称", "")
                 name = str(name_raw).strip() if "证券名称" in df.columns and pd.notna(name_raw) else ""
-                cost = float(row["买入成本"]) if "买入成本" in df.columns and pd.notna(row.get("买入成本")) else None
+                cost = float(row["参考成本价"]) if "参考成本价" in df.columns and pd.notna(row.get("参考成本价")) else None
                 buy_date = str(row.get("买入日期", "")).strip() if "买入日期" in df.columns else ""
                 notes = str(row.get("备注", "")).strip() if "备注" in df.columns else ""
 
@@ -142,7 +142,7 @@ class ImportExportService:
                 "FROM positions WHERE is_active = 1 ORDER BY stock_code"
             )
 
-        df = pd.DataFrame(rows, columns=["证券代码", "证券名称", "持仓数量", "买入成本", "买入日期", "备注"])
+        df = pd.DataFrame(rows, columns=["证券代码", "证券名称", "持仓数量", "参考成本价", "买入日期", "备注"])
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         filename = f"positions_{timestamp}.{fmt}"
         filepath = EXPORT_DIR / filename
