@@ -1,10 +1,24 @@
 """同步管理器：编排数据拉取、去重、日志记录"""
+import threading
 from datetime import datetime
 from typing import Optional, Callable
 import pandas as pd
 from database.engine import DatabaseEngine
 from .dividend_provider import DividendProvider, create_provider
 from utils.exceptions import DataSyncError
+
+_sync_lock = threading.Lock()
+_sync_in_progress = False
+
+
+def is_syncing() -> bool:
+    return _sync_in_progress
+
+
+def _set_sync_flag(active: bool):
+    global _sync_in_progress
+    with _sync_lock:
+        _sync_in_progress = active
 
 
 class SyncManager:

@@ -1,5 +1,6 @@
 """股票分红计算助手 — Streamlit 入口"""
 import streamlit as st
+import threading
 from config import STREAMLIT_PAGE_CONFIG
 from database.schema import init_database
 from database.engine import DatabaseEngine
@@ -11,6 +12,37 @@ if "db_initialized" not in st.session_state:
     init_database()
     DatabaseEngine.get_connection()
     st.session_state["db_initialized"] = True
+
+
+def _background_sync_and_calculate():
+    """后台线程：同步分红数据 + 市价 + 计算分红"""
+    from data_sync.sync_manager import _set_sync_flag
+    db = DatabaseEngine()
+    positions = db.fetch_all("SELECT 1 FROM positions WHERE is_active = 1 LIMIT 1")
+    if not positions:
+        return
+    _set_sync_flag(True)
+    try:
+        from data_sync.sync_manager import SyncManager
+        SyncManager().sync_all()
+    except Exception:
+        pass
+    try:
+        from services.dividend_service import DividendCalculationService
+        DividendCalculationService().calculate_all()
+    except Exception:
+        pass
+    finally:
+        _set_sync_flag(False)
+
+
+# 启动时后台自动同步（每会话执行一次，不阻塞页面渲染）
+if "auto_sync_done" not in st.session_state:
+    st.session_state["auto_sync_done"] = False
+
+if not st.session_state["auto_sync_done"]:
+    st.session_state["auto_sync_done"] = True
+    threading.Thread(target=_background_sync_and_calculate, daemon=True).start()
 
 # 导航
 pages = {

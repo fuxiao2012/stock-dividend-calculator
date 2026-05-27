@@ -13,10 +13,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 C:\Users\85433\AppData\Local\Programs\Python\Python314\python.exe -m pip install -r requirements.txt
 
 # 启动应用
-C:\Users\85433\AppData\Local\Programs\Python\Python314\python.exe -m streamlit run app.py
+cd "d:/工作/CBF开发/Stock"
+C:/Users/85433/AppData/Local/Programs/Python/Python314/python.exe -m streamlit run stock_dividend_calculator/app.py --server.port 8502 --server.headless true
 
-# 停止服务（清理锁文件）
-powershell -Command "Stop-Process -Name python -Force -ErrorAction SilentlyContinue"
+# 停止服务（先 WAL checkpoint 再杀进程，防止数据丢失）
+cd "d:/工作/CBF开发/Stock/stock_dividend_calculator"
+C:/Users/85433/AppData/Local/Programs/Python/Python314/python.exe -c "import sys; sys.path.insert(0, '.'); from database.engine import DatabaseEngine; c = DatabaseEngine.get_connection(); c.execute('PRAGMA wal_checkpoint(TRUNCATE)'); c.close()"
+MSYS_NO_PATHCONV=1 /c/Windows/System32/taskkill.exe /F /IM python.exe
 rm -f data/stock_dividend.db-shm data/stock_dividend.db-wal
 ```
 

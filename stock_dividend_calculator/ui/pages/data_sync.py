@@ -2,12 +2,16 @@
 import streamlit as st
 import pandas as pd
 from datetime import datetime
-from data_sync.sync_manager import SyncManager
+from data_sync.sync_manager import SyncManager, is_syncing
 from database.engine import DatabaseEngine
 
 db = DatabaseEngine()
 
 st.title("🔄 数据同步")
+
+# 后台同步中提示
+if is_syncing():
+    st.info("⏳ 后台正在自动同步数据，请稍候再手动操作...")
 
 # 同步状态
 sync_logs = db.fetch_all(
@@ -50,7 +54,7 @@ col1, col2 = st.columns(2)
 with col1:
     st.subheader("🔄 全量同步")
     st.caption("同步所有持仓股票的分红数据")
-    if st.button("开始全量同步", type="primary", use_container_width=True):
+    if st.button("开始全量同步", type="primary", use_container_width=True, disabled=is_syncing()):
         mgr = SyncManager()
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -74,7 +78,7 @@ with col2:
     st.subheader("🔍 单股同步")
     st.caption("同步指定证券代码的分红数据")
     stock_code = st.text_input("证券代码", placeholder="如: 000001")
-    if st.button("同步单只股票", use_container_width=True):
+    if st.button("同步单只股票", use_container_width=True, disabled=is_syncing()):
         if not stock_code.strip():
             st.error("请输入证券代码")
         else:
